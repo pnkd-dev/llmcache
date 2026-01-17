@@ -1,5 +1,5 @@
 {
-  "name": "llmcache",
+  "name": "pnkd-llmcache",
   "version": "1.0.0",
   "description": "Cache LLM responses. Save tokens, save money.",
   "main": "src/cache.js",
