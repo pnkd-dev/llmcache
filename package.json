@@ -1,0 +1,20 @@
+{
+  "name": "llmcache",
+  "version": "1.0.0",
+  "description": "Cache LLM responses. Save tokens, save money.",
+  "main": "src/cache.js",
+  "bin": {
+    "llmcache": "./bin/llmcache.js"
+  },
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": ["llm", "cache", "gpt", "openai", "anthropic", "prompt"],
+  "author": "pnkd.dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pnkd-dev/llmcache"
+  },
+  "homepage": "https://pnkd.dev/llmcache"
+}
