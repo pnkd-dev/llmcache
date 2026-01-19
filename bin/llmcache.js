@@ -1,234 +1,224 @@
 #!/usr/bin/env node
 
-// pnkd.dev/llmcache - LLM response cache CLI
+/**
+ * llmcache CLI
+ * LLM Response Caching Tool
+ */
 
-const cache = require('../src/cache');
+const { Command } = require('commander');
+const pkg = require('../package.json');
+const { isPro } = require('../src/license/checker');
+const { colors, version: formatVersion } = require('../src/utils/output');
 
-const args = process.argv.slice(2);
-const command = args[0];
+const program = new Command();
 
-const cyan = '\x1b[36m';
-const green = '\x1b[32m';
-const yellow = '\x1b[33m';
-const dim = '\x1b[2m';
-const reset = '\x1b[0m';
+// Version display
+const tier = isPro() ? 'pro' : 'free';
+program
+  .name('llmcache')
+  .description('Cache LLM responses to save time and money')
+  .version(formatVersion(pkg.version, tier), '-v, --version');
 
-function parseArgs(args) {
-  const options = { model: 'default' };
-  const positional = [];
+// Global options
+program
+  .option('-g, --global', 'Use global cache (~/.llmcache/cache)')
+  .option('-p, --path <path>', 'Custom cache path');
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--model' || arg === '-m') {
-      options.model = args[++i];
-    } else if (arg === '--older-than') {
-      options.olderThan = args[++i];
-    } else if (!arg.startsWith('-')) {
-      positional.push(arg);
-    }
-  }
-
-  return { options, positional };
-}
-
-function showHelp() {
-  console.log(`
-  ${cyan}llmcache${reset} - cache LLM responses. save tokens, save money.
-
-  ${dim}Usage:${reset}
-    llmcache <command> [options]
-
-  ${dim}Commands:${reset}
-    init                    Initialize cache in current directory
-    set                     Cache a response (reads from stdin)
-    get <prompt>            Get cached response
-    list, ls                List cached entries
-    stats                   Show cache statistics
-    clear                   Clear all cache
-    clear --older-than 7d   Clear entries older than N days
-    search <query>          Search cached prompts
-    export                  Export cache as JSON
-
-  ${dim}Options:${reset}
-    -m, --model <name>      Model name (default: "default")
-    -h, --help              Show this help
-
-  ${dim}Examples:${reset}
-    llmcache init
-    echo "response text" | llmcache set "prompt" --model gpt-4
-    llmcache get "prompt" --model gpt-4
-    llmcache list
-    llmcache search "python"
-
-  ${dim}Docs:${reset}    https://pnkd.dev/llmcache
-  ${dim}Issues:${reset}  https://github.com/pnkd-dev/llmcache/issues
-
-  ${cyan}pnkd.dev${reset} ${dim}- glitch the system${reset}
-`);
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-async function readStdin() {
-  return new Promise((resolve) => {
-    let data = '';
-    process.stdin.setEncoding('utf8');
-
-    if (process.stdin.isTTY) {
-      resolve('');
-      return;
-    }
-
-    process.stdin.on('readable', () => {
-      let chunk;
-      while ((chunk = process.stdin.read()) !== null) {
-        data += chunk;
-      }
-    });
-
-    process.stdin.on('end', () => {
-      resolve(data.trim());
-    });
+// Init command
+program
+  .command('init')
+  .description('Initialize a new cache')
+  .option('-b, --backend <type>', 'Storage backend: json, sqlite, redis', 'json')
+  .action((options) => {
+    const { execute } = require('../src/commands/init');
+    const globalOpts = program.opts();
+    execute({ ...globalOpts, ...options });
   });
+
+// Set command
+program
+  .command('set <prompt> <response>')
+  .description('Cache a prompt/response pair')
+  .option('-m, --model <name>', 'Model name', 'default')
+  .option('-t, --ttl <duration>', 'Time to live (PRO): 7d, 24h, 30m')
+  .option('--tags <tags>', 'Comma-separated tags (PRO)')
+  .action((prompt, response, options) => {
+    const { execute } = require('../src/commands/set');
+    const globalOpts = program.opts();
+    execute(prompt, response, { ...globalOpts, ...options });
+  });
+
+// Get command
+program
+  .command('get <prompt>')
+  .description('Get cached response for a prompt')
+  .option('-m, --model <name>', 'Model name', 'default')
+  .option('-r, --raw', 'Output only the response')
+  .option('-o, --output <file>', 'Write response to file')
+  .action((prompt, options) => {
+    const { execute } = require('../src/commands/get');
+    const globalOpts = program.opts();
+    execute(prompt, { ...globalOpts, ...options });
+  });
+
+// List command
+program
+  .command('list')
+  .alias('ls')
+  .description('List cached entries')
+  .option('-m, --model <name>', 'Filter by model')
+  .option('-l, --limit <n>', 'Limit results', '20')
+  .option('-s, --sort <field>', 'Sort by: created, hits')
+  .option('--json', 'Output as JSON')
+  .action((options) => {
+    const { execute } = require('../src/commands/list');
+    const globalOpts = program.opts();
+    execute({ ...globalOpts, ...options });
+  });
+
+// Stats command
+program
+  .command('stats')
+  .description('Show cache statistics')
+  .option('--json', 'Output as JSON')
+  .action((options) => {
+    const { execute } = require('../src/commands/stats');
+    const globalOpts = program.opts();
+    execute({ ...globalOpts, ...options });
+  });
+
+// Clear command
+program
+  .command('clear')
+  .description('Clear cache entries')
+  .option('--older-than <days>', 'Clear entries older than N days')
+  .option('-y, --yes', 'Skip confirmation')
+  .option('-f, --force', 'Force clear (alias for --yes)')
+  .action((options) => {
+    const { execute } = require('../src/commands/clear');
+    const globalOpts = program.opts();
+    execute({ ...globalOpts, ...options });
+  });
+
+// Search command
+program
+  .command('search <query>')
+  .description('Search cached prompts')
+  .option('-l, --limit <n>', 'Limit results', '20')
+  .option('--json', 'Output as JSON')
+  .action((query, options) => {
+    const { execute } = require('../src/commands/search');
+    const globalOpts = program.opts();
+    execute(query, { ...globalOpts, ...options });
+  });
+
+// Export command
+program
+  .command('export [output]')
+  .description('Export cache to JSON')
+  .option('--pretty', 'Pretty print JSON')
+  .action((output, options) => {
+    const { execute } = require('../src/commands/export');
+    const globalOpts = program.opts();
+    execute(output, { ...globalOpts, ...options });
+  });
+
+// Import command
+program
+  .command('import <input>')
+  .description('Import cache from JSON')
+  .option('--strategy <type>', 'Import strategy: merge, replace, skip-existing', 'merge')
+  .action((input, options) => {
+    const { execute } = require('../src/commands/import');
+    const globalOpts = program.opts();
+    execute(input, { ...globalOpts, ...options });
+  });
+
+// Cost command (PRO)
+program
+  .command('cost')
+  .description('Show cost savings report (PRO)')
+  .option('--models', 'Show supported models and pricing')
+  .option('--json', 'Output as JSON')
+  .action((options) => {
+    const { execute } = require('../src/commands/cost');
+    const globalOpts = program.opts();
+    execute({ ...globalOpts, ...options });
+  });
+
+// Similar command (PRO)
+program
+  .command('similar <prompt>')
+  .description('Find similar cached prompts (PRO)')
+  .option('-t, --threshold <n>', 'Similarity threshold (0-1)', '0.3')
+  .option('-l, --limit <n>', 'Limit results', '10')
+  .option('-b, --best', 'Return only the best match')
+  .option('--json', 'Output as JSON')
+  .action((prompt, options) => {
+    const { execute } = require('../src/commands/similar');
+    const globalOpts = program.opts();
+    execute(prompt, { ...globalOpts, ...options });
+  });
+
+// Sync command (PRO)
+program
+  .command('sync <action>')
+  .description('Sync cache: push, pull, status (PRO)')
+  .option('-r, --remote <path>', 'Remote storage path')
+  .option('--strategy <type>', 'Import strategy: merge, replace, skip-existing', 'merge')
+  .action((action, options) => {
+    const { execute } = require('../src/commands/sync');
+    const globalOpts = program.opts();
+    execute(action, { ...globalOpts, ...options });
+  });
+
+// Serve command (PRO)
+program
+  .command('serve')
+  .description('Start HTTP server (PRO)')
+  .option('--port <n>', 'Port number', '3377')
+  .option('--host <host>', 'Host to bind', 'localhost')
+  .action((options) => {
+    const { execute } = require('../src/commands/serve');
+    const globalOpts = program.opts();
+    execute({ ...globalOpts, ...options });
+  });
+
+// License command
+program
+  .command('license [action] [key]')
+  .description('Manage license: status, activate, deactivate')
+  .action((action, key, options) => {
+    const { execute } = require('../src/commands/license');
+    execute(action, key, options);
+  });
+
+// Help customization
+program.addHelpText('after', `
+${colors.header('Examples:')}
+  $ llmcache init                          Initialize local cache
+  $ llmcache init -g                       Initialize global cache
+  $ llmcache set "What is AI?" "AI is..." Cache a response
+  $ llmcache get "What is AI?"            Get cached response
+  $ llmcache set @prompt.txt @response.txt Use files
+  $ llmcache stats                         Show statistics
+  $ llmcache search "AI"                   Search prompts
+
+${colors.pro('PRO Commands:')}
+  $ llmcache cost                          Show cost savings
+  $ llmcache similar "What is ML?"         Find similar prompts
+  $ llmcache sync push --remote /shared    Push to remote
+  $ llmcache serve --port 3377             Start HTTP server
+
+${colors.dim('License:')}
+  $ llmcache license status                Check license
+  $ llmcache license activate LMC-XXXX-... Activate PRO
+`);
+
+// Parse arguments
+program.parse();
+
+// Show help if no command
+if (!process.argv.slice(2).length) {
+  program.outputHelp();
 }
-
-async function main() {
-  if (!command || command === '--help' || command === '-h') {
-    showHelp();
-    process.exit(0);
-  }
-
-  const { options, positional } = parseArgs(args.slice(1));
-
-  switch (command) {
-    case 'init': {
-      const result = cache.init();
-      if (result.success) {
-        console.log(green + '  ✓ Cache initialized at .llmcache/' + reset);
-      } else {
-        console.log(yellow + '  ! ' + result.message + reset);
-      }
-      break;
-    }
-
-    case 'set': {
-      const prompt = positional[0];
-      if (!prompt) {
-        console.error('  Error: prompt required. Usage: llmcache set "prompt"');
-        process.exit(1);
-      }
-      const response = await readStdin();
-      if (!response) {
-        console.error('  Error: response required via stdin');
-        process.exit(1);
-      }
-      const result = cache.set(prompt, response, options.model);
-      if (result.success) {
-        console.log(green + '  ✓ Cached [' + result.hash + ']' + reset);
-      } else {
-        console.error('  Error: ' + result.message);
-        process.exit(1);
-      }
-      break;
-    }
-
-    case 'get': {
-      const prompt = positional[0];
-      if (!prompt) {
-        console.error('  Error: prompt required. Usage: llmcache get "prompt"');
-        process.exit(1);
-      }
-      const result = cache.get(prompt, options.model);
-      if (result) {
-        console.log(cyan + '  [HIT]' + reset + ' Found cached response');
-        console.log(result.response);
-      } else {
-        console.log(dim + '  [MISS] No cached response' + reset);
-        process.exit(1);
-      }
-      break;
-    }
-
-    case 'list':
-    case 'ls': {
-      const entries = cache.list();
-      if (entries.length === 0) {
-        console.log(dim + '  No cached entries' + reset);
-        break;
-      }
-      console.log('\n  ' + dim + 'HASH        MODEL       HITS  PROMPT' + reset);
-      for (const e of entries) {
-        console.log('  ' + cyan + e.hash + reset + '  ' + e.model.padEnd(10) + '  ' + String(e.hits).padStart(4) + '  ' + e.prompt);
-      }
-      console.log('');
-      break;
-    }
-
-    case 'stats': {
-      const s = cache.stats();
-      if (!s) {
-        console.error('  Cache not initialized. Run: llmcache init');
-        process.exit(1);
-      }
-      console.log('\n  ' + cyan + 'llmcache stats' + reset);
-      console.log('  ' + dim + '──────────────' + reset);
-      console.log('  Entries:      ' + s.entries);
-      console.log('  Total hits:   ' + s.totalHits);
-      console.log('  Tokens saved: ~' + s.tokensSaved.toLocaleString());
-      console.log('  Cache size:   ' + formatSize(s.cacheSize));
-      console.log('');
-      break;
-    }
-
-    case 'clear': {
-      const result = cache.clear(options);
-      if (result.success) {
-        console.log(green + '  ✓ Cleared ' + result.removed + ' entries' + reset);
-      } else {
-        console.error('  Error: ' + result.message);
-        process.exit(1);
-      }
-      break;
-    }
-
-    case 'search': {
-      const query = positional[0];
-      if (!query) {
-        console.error('  Error: query required. Usage: llmcache search "query"');
-        process.exit(1);
-      }
-      const results = cache.search(query);
-      if (results.length === 0) {
-        console.log(dim + '  No matches found' + reset);
-        break;
-      }
-      console.log('\n  ' + dim + 'HASH        MODEL       HITS  PROMPT' + reset);
-      for (const e of results) {
-        console.log('  ' + cyan + e.hash + reset + '  ' + e.model.padEnd(10) + '  ' + String(e.hits).padStart(4) + '  ' + e.prompt);
-      }
-      console.log('');
-      break;
-    }
-
-    case 'export': {
-      const data = cache.exportCache();
-      if (!data) {
-        console.error('  Cache not initialized. Run: llmcache init');
-        process.exit(1);
-      }
-      console.log(JSON.stringify(data, null, 2));
-      break;
-    }
-
-    default:
-      console.error('  Unknown command: ' + command);
-      console.error('  Run: llmcache --help');
-      process.exit(1);
-  }
-}
-
-main();

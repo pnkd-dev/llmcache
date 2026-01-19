@@ -1,20 +1,55 @@
 {
   "name": "pnkd-llmcache",
-  "version": "1.0.0",
-  "description": "Cache LLM responses. Save tokens, save money.",
-  "main": "src/cache.js",
+  "version": "2.0.0",
+  "description": "Cache LLM responses. Save tokens, save money. PRO features: cost tracking, semantic search, compression.",
+  "main": "src/index.js",
   "bin": {
     "llmcache": "./bin/llmcache.js"
   },
   "scripts": {
-    "test": "node test.js"
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
   },
-  "keywords": ["llm", "cache", "gpt", "openai", "anthropic", "prompt"],
+  "keywords": [
+    "llm",
+    "cache",
+    "gpt",
+    "openai",
+    "anthropic",
+    "prompt",
+    "tokens",
+    "api",
+    "cost",
+    "savings",
+    "claude",
+    "chatgpt"
+  ],
   "author": "pnkd.dev",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/pnkd-dev/llmcache"
   },
-  "homepage": "https://pnkd.dev/llmcache"
+  "homepage": "https://pnkd.dev/llmcache",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^9.2.2",
+    "express": "^4.18.2",
+    "lz4": "^0.6.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ]
 }
